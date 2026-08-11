@@ -3,14 +3,13 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
-  <title>Báo in WebAR Experience</title>
+  <title>Test WebAR Big Buck Bunny</title>
   
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
   
   <style>
     body { margin: 0; overflow: hidden; }
-    
     #overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -26,7 +25,6 @@
       padding: 20px;
       box-sizing: border-box;
     }
-
     #start-btn {
       padding: 14px 28px;
       font-size: 18px;
@@ -44,7 +42,6 @@
 
   <div id="overlay">
     <h2 id="status-text">Sẵn sàng trải nghiệm AR</h2>
-    <p>Nhấn nút bên dưới để cấp quyền phát video</p>
     <button id="start-btn">Bắt đầu quét</button>
   </div>
 
@@ -57,10 +54,9 @@
     device-orientation-permission-ui="enabled: false">
     
     <a-assets>
-      <!-- Khai báo video bắt buộc có đủ các thuộc tính chống bị trắng -->
       <video 
         id="ar-video" 
-        src="./video-0.mp4" 
+        src="https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4" 
         preload="auto" 
         loop 
         crossorigin="anonymous" 
@@ -73,7 +69,6 @@
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <a-entity mindar-image-target="targetIndex: 0" id="target-entity">
-      <!-- Dùng material shader: flat để tránh bị hiện màu trắng do ánh sáng 3D -->
       <a-video 
         src="#ar-video" 
         width="1" 
@@ -92,41 +87,30 @@
     const overlay = document.querySelector('#overlay');
     const statusText = document.querySelector('#status-text');
     const startBtn = document.querySelector('#start-btn');
+    const aVideo = document.querySelector('a-video');
 
-    // Mở khóa autoplay & load trước dữ liệu video khi bấm nút
     startBtn.addEventListener('click', () => {
-      statusText.innerText = "Đang tải video...";
-      
-      // Mở load video
-      video.load();
+      statusText.innerText = "Đang tải dữ liệu...";
       video.play().then(() => {
-        video.pause(); // Bật ngầm sẵn sàng
+        video.pause();
         startBtn.style.display = 'none';
         statusText.innerText = 'Hướng camera về phía trang báo...';
         overlay.style.pointerEvents = 'none';
-      }).catch(err => {
-        console.error("Lỗi kích hoạt video:", err);
-        alert("Không thể khởi tạo video: " + err.message);
       });
     });
 
-    // Khi quét trúng ảnh báo
     targetEntity.addEventListener("targetFound", () => {
       overlay.style.display = "none";
-      video.muted = false; // Bật tiếng
-      
-      // Đảm bảo video chạy mượt khi bắt được ảnh
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log("Autoplay bị chặn, chuyển sang chế độ muted:", error);
-          video.muted = true;
-          video.play();
-        });
-      }
+      video.muted = false;
+      video.play();
+
+      setTimeout(() => {
+        if (aVideo.components.material && aVideo.components.material.material.map) {
+          aVideo.components.material.material.map.needsUpdate = true;
+        }
+      }, 200);
     });
 
-    // Khi mất tín hiệu ảnh báo
     targetEntity.addEventListener("targetLost", () => {
       overlay.style.display = "flex";
       statusText.innerText = 'Hướng camera về phía trang báo...';
