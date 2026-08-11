@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta charset="UTF-8">
-  <title>Test WebAR Big Buck Bunny</title>
+  <title>iOS WebAR Experience</title>
   
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
@@ -13,28 +13,29 @@
     #overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.85);
       color: white;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 999;
-      font-family: sans-serif;
+      z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       text-align: center;
       padding: 20px;
       box-sizing: border-box;
     }
     #start-btn {
-      padding: 14px 28px;
+      padding: 16px 32px;
       font-size: 18px;
       font-weight: bold;
-      background-color: #28a745;
+      background-color: #0275d8;
       color: white;
       border: none;
-      border-radius: 8px;
-      margin-top: 15px;
+      border-radius: 12px;
+      margin-top: 20px;
       cursor: pointer;
+      outline: none;
     }
   </style>
 </head>
@@ -42,75 +43,88 @@
 
   <div id="overlay">
     <h2 id="status-text">Sẵn sàng trải nghiệm AR</h2>
-    <button id="start-btn">Bắt đầu quét</button>
+    <p>Bấm nút bên dưới để cấp quyền hiển thị Video trên iPhone</p>
+    <button id="start-btn">Chạm để bắt đầu</button>
   </div>
 
   <a-scene 
     mindar-image="imageTargetSrc: ./targets.mind;" 
     color-space="sRGB" 
-    renderer="colorCorrection: true, pictureInPicture: true" 
+    renderer="colorCorrection: true; pictureInPicture: true" 
     embedded 
     vr-mode-ui="enabled: false" 
     device-orientation-permission-ui="enabled: false">
     
-    <a-assets>
-      <video 
-        id="ar-video" 
-        src="https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4" 
-        preload="auto" 
-        loop 
-        crossorigin="anonymous" 
-        webkit-playsinline 
-        playsinline 
-        muted>
-      </video>
-    </a-assets>
-
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <a-entity mindar-image-target="targetIndex: 0" id="target-entity">
-      <a-video 
-        src="#ar-video" 
-        width="1" 
-        height="0.6" 
-        position="0 0 0.05" 
-        rotation="0 0 0"
-        material="shader: flat; src: #ar-video;">
-      </a-video>
+      <a-plane id="video-plane" width="1" height="0.6" position="0 0 0.02" rotation="0 0 0"></a-plane>
     </a-entity>
 
   </a-scene>
 
   <script>
+    // Khởi tạo thẻ video bằng JS thuần để tương thích iOS WebKit
+    const video = document.createElement('video');
+    
+    // Đổi link video của bạn tại đây (lưu ý dùng file MP4 H.264 dưới 8MB)
+    video.src = "https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4";
+    
+    video.setAttribute('crossorigin', 'anonymous');
+    video.setAttribute('webkit-playsinline', 'true');
+    video.setAttribute('playsinline', 'true');
+    video.preload = 'auto';
+    video.loop = true;
+    video.muted = true; // Muted bắt buộc cho iOS
+
     const targetEntity = document.querySelector('#target-entity');
-    const video = document.querySelector('#ar-video');
+    const videoPlane = document.querySelector('#video-plane');
     const overlay = document.querySelector('#overlay');
     const statusText = document.querySelector('#status-text');
     const startBtn = document.querySelector('#start-btn');
-    const aVideo = document.querySelector('a-video');
+
+    let isTextureReady = false;
 
     startBtn.addEventListener('click', () => {
-      statusText.innerText = "Đang tải dữ liệu...";
+      statusText.innerText = "Đang khởi tạo...";
+
+      // Ép WebKit trên iOS kích hoạt luồng phát Video
       video.play().then(() => {
         video.pause();
+
+        // Tạo Three.js Texture thủ công cấp thấp cho iOS WebGL
+        const texture = new THREE.VideoTexture(video);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.format = THREE.RGBAFormat;
+
+        const material = new THREE.MeshBasicMaterial({ 
+          map: texture, 
+          side: THREE.DoubleSide 
+        });
+        
+        videoPlane.getObject3D('mesh').material = material;
+        isTextureReady = true;
+
         startBtn.style.display = 'none';
         statusText.innerText = 'Hướng camera về phía trang báo...';
         overlay.style.pointerEvents = 'none';
+      }).catch(err => {
+        alert("Lỗi cấp quyền Chrome iOS: " + err.message);
       });
     });
 
+    // Khi camera nhận diện được báo
     targetEntity.addEventListener("targetFound", () => {
       overlay.style.display = "none";
-      video.muted = false;
-      video.play();
-
-      setTimeout(() => {
-        if (aVideo.components.material && aVideo.components.material.material.map) {
-          aVideo.components.material.material.map.needsUpdate = true;
-        }
-      }, 200);
+      if (isTextureReady) {
+        // Mở tiếng sau khi đã có tương tác chạm người dùng
+        video.muted = false;
+        video.play();
+      }
     });
 
+    // Khi di chuyển camera ra khỏi báo
     targetEntity.addEventListener("targetLost", () => {
       overlay.style.display = "flex";
       statusText.innerText = 'Hướng camera về phía trang báo...';
